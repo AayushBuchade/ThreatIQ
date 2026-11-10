@@ -50,3 +50,4 @@ export async function fetchRecentEvents() {
   }
   return response.json();
 }
+

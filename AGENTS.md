@@ -68,3 +68,4 @@ Only four statuses may be assigned to tasks and milestones:
 - **Unit Tests:** Pytest suites covering schema validation, routing, and deterministic logic.
 - **Integration Tests:** End-to-end verification of frontend-to-backend-to-database communication.
 - **CI Pipeline:** GitHub Actions running linting, type checks, and pytest on all pull requests against `dev/foundation`.
+

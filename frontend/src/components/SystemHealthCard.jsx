@@ -87,3 +87,4 @@ export default function SystemHealthCard({ healthData, systemStatus, loading, on
     </div>
   );
 }
+
