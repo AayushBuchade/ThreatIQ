@@ -1,0 +1,84 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: threatiq-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/threatiq
+      - SYNC_DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/threatiq
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=threatiq-production-secret-change-before-deployment
+      - ALLOW_DESTRUCTIVE_ACTIONS=false
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - threatiq-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: threatiq-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - threatiq-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: threatiq-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=threatiq
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d threatiq"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - threatiq-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: threatiq-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - threatiq-network
+
+networks:
+  threatiq-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
