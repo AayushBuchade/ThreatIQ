@@ -6,13 +6,18 @@ Coverage:
   - to_security_event(): field mapping, severity conversion, attribute population
   - _persist_event()  : database roundtrip through EventPipelineService
   - SyslogParseError  : all rejection paths are tested explicitly
+  - Async UDP integration: real socket, real listener, real persistence layer
 
-No real UDP socket is opened during the tests — the listener protocol is
-exercised directly by calling datagram_received() with synthetic data.
+No real UDP socket is opened during the non-async tests — the listener
+protocol is exercised directly by calling datagram_received() with synthetic
+data.  The async integration test uses an ephemeral port.
 """
 
+import asyncio
+import socket
 import pytest
 from datetime import timezone
+from unittest.mock import patch
 
 from backend.app.services.syslog_parser import (
     SyslogParseError,
@@ -340,4 +345,94 @@ class TestSyslogUDPProtocol:
             proto.datagram_received(b"", ("127.0.0.1", 12345))
         except Exception as exc:
             pytest.fail(f"datagram_received raised on empty data: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# 7. Async UDP integration — real socket, ephemeral port, real persistence
+# ---------------------------------------------------------------------------
+
+class TestSyslogUDPIntegration:
+    """
+    Sends a valid RFC 5424 datagram to a live UDP listener bound on an
+    ephemeral loopback port and verifies the event reaches the persistence
+    layer (in-memory SQLite test DB via db_session fixture).
+
+    Strategy (no production-file changes required):
+      - Define a test-local subclass of _SyslogUDPProtocol that overrides
+        datagram_received() to persist synchronously on the event-loop thread
+        (via EventPipelineService + db_session) and resolves an asyncio.Future
+        so the test can await completion.  This avoids the run_in_executor
+        deadlock that would occur if the production code path were used inside
+        a single-threaded asyncio test loop.
+      - Bind the subclass on port 0 (OS picks ephemeral port).
+      - Send a datagram via a plain UDP socket.
+      - Await the future (max 2 s), then assert the DB record.
+    """
+
+    @pytest.mark.asyncio
+    async def test_udp_listener_persists_event_end_to_end(self, db_session):
+        loop = asyncio.get_running_loop()
+        done: asyncio.Future = loop.create_future()
+        persisted_records: list = []
+
+        # Test-local protocol subclass: same parsing as production but
+        # persists synchronously within the event-loop thread so we can
+        # await the result without deadlocking.
+        class _TestProtocol(_SyslogUDPProtocol):
+            def datagram_received(self, data: bytes, addr) -> None:
+                from backend.app.services.syslog_parser import SyslogParseError, parse_rfc5424, to_security_event
+                sender_ip = addr[0]
+                try:
+                    msg = parse_rfc5424(data)
+                except SyslogParseError as exc:
+                    done.set_exception(AssertionError(f"Parse failed unexpectedly: {exc}"))
+                    return
+                event_in = to_security_event(msg)
+                event_in = event_in.model_copy(update={"source_ip": sender_ip})
+                try:
+                    db_event, _ = EventPipelineService.ingest_event(db_session, event_in)
+                    persisted_records.append(db_event)
+                    if not done.done():
+                        done.set_result(db_event.event_id)
+                except Exception as exc:
+                    if not done.done():
+                        done.set_exception(exc)
+
+        # Bind listener on 127.0.0.1 with port=0 → OS assigns ephemeral port
+        transport, _ = await loop.create_datagram_endpoint(
+            _TestProtocol,
+            local_addr=("127.0.0.1", 0),
+        )
+        bound_addr = transport.get_extra_info("sockname")
+        listener_host, listener_port = bound_addr[0], bound_addr[1]
+
+        try:
+            # Send a valid RFC 5424 datagram via a plain UDP socket
+            raw = (
+                b"<34>1 2026-11-12T12:00:00.000Z webserver01 nginx - - "
+                b"- UDP integration test event"
+            )
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                sock.sendto(raw, (listener_host, listener_port))
+            finally:
+                sock.close()
+
+            # Yield to the event loop so datagram_received() fires, then
+            # await the future (timeout = 2 s)
+            event_id = await asyncio.wait_for(done, timeout=2.0)
+        finally:
+            transport.close()
+
+        # --- Assertions ---
+        assert event_id.startswith("tiq-"), (
+            f"Expected event_id starting with 'tiq-', got {event_id!r}"
+        )
+        assert len(persisted_records) == 1
+        record = persisted_records[0]
+        assert record.event_type == "syslog.auth.nginx"
+        assert record.severity == "critical"   # PRI=34 → facility=4, sev=2 (CRITICAL)
+        assert record.source_ip == "127.0.0.1"
+        assert "UDP integration test event" in record.message
+        assert record.attributes["syslog_hostname"] == "webserver01"
 
