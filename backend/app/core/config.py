@@ -34,6 +34,10 @@ class Settings(BaseSettings):
         "http://localhost:8000",
     ]
 
+    # Syslog UDP Listener Settings (RFC 5424)
+    SYSLOG_UDP_HOST: str = "127.0.0.1"
+    SYSLOG_UDP_PORT: int = 5514
+
     # Enforcement of Zero-Destructive Action Rule
     ALLOW_DESTRUCTIVE_ACTIONS: bool = False
 

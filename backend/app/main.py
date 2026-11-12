@@ -3,6 +3,7 @@ ThreatIQ FastAPI Application Entry Point
 """
 
 from contextlib import asynccontextmanager
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.core.config import settings
@@ -10,6 +11,7 @@ from backend.app.core.logging import logger
 from backend.app.core.security import SecurityHeadersMiddleware
 from backend.app.api.v1.router import api_router
 from backend.app.db.init_db import init_db
+from backend.app.services.syslog_listener import start_syslog_listener, stop_syslog_listener
 
 
 @asynccontextmanager
@@ -23,8 +25,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error during database initialization: {e}")
 
+    # Start RFC 5424 Syslog UDP listener (skipped in test environment)
+    if os.environ.get("ENVIRONMENT") != "testing":
+        await start_syslog_listener()
+
     yield
 
+    # Shut down Syslog listener before exiting
+    if os.environ.get("ENVIRONMENT") != "testing":
+        stop_syslog_listener()
     logger.info(f"Shutting down {settings.PROJECT_NAME}")
 
 
