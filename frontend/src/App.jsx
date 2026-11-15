@@ -11,6 +11,13 @@ export default function App() {
   const [healthData, setHealthData] = useState(null);
   const [systemStatus, setSystemStatus] = useState(null);
   const [modules, setModules] = useState([]);
+  const criticalCount = recentEvents.filter(
+  event => event.severity === 'critical'
+).length;
+
+const highCount = recentEvents.filter(
+  event => event.severity === 'high'
+).length;
   const [recentEvents, setRecentEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -85,6 +92,18 @@ export default function App() {
           )}
 
           {/* System Health */}
+          <div className="grid grid-cols-3 gap-4">
+  {[
+    ['Recent Events', recentEvents.length, 'text-cyan-400'],
+    ['Critical', criticalCount, 'text-red-400'],
+    ['High', highCount, 'text-orange-400']
+  ].map(([label, value, color]) => (
+    <div key={label} className="bg-[#111827] border border-slate-800 rounded-xl p-5">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className={`text-3xl font-bold mt-2 ${color}`}>{value}</p>
+    </div>
+  ))}
+</div>
           <SystemHealthCard
             healthData={healthData}
             systemStatus={systemStatus}
