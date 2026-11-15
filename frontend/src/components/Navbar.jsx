@@ -21,7 +21,7 @@ export default function Navbar({ systemHealthy }) {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 text-xs px-3 py-1.5 rounded-md bg-slate-900 border border-slate-800">
             <span className="text-slate-400">Phase:</span>
-            <span className="font-semibold text-cyan-400">Phase 0 (Foundation)</span>
+            <span className="font-semibold text-cyan-400">Phase 1 (In Progress)</span>
           </div>
 
           <div className="flex items-center space-x-2">
