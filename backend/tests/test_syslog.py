@@ -211,6 +211,11 @@ class TestToSecurityEvent:
         event = to_security_event(parse_rfc5424(raw))
         assert event.severity == "critical"
 
+    def test_severity_high_for_error_code(self):
+        raw = b"<35>1 - host sshd - - - Login failure"
+        event = to_security_event(parse_rfc5424(raw))
+        assert event.severity == "high"
+
     def test_severity_medium_for_warning(self):
         # PRI=36 → facility=4 (auth), severity=4 (WARNING)
         raw = b"<36>1 - host app - - - warning message"
