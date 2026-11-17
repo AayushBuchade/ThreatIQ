@@ -31,7 +31,9 @@ from backend.app.services.syslog_listener import (
     _persist_event,
     _SyslogUDPProtocol,
     start_syslog_listener,
+    start_syslog_tcp_listener,
     stop_syslog_listener,
+    stop_syslog_tcp_listener,
     _transport as listener_transport,
 )
 from backend.app.services.event_pipeline import EventPipelineService
@@ -422,4 +424,134 @@ class TestSyslogUDPIntegration:
             assert matched_event.attributes.get("syslog_app_name") == "nginx"
         finally:
             stop_syslog_listener()
+
+
+# ---------------------------------------------------------------------------
+# 8. Async TCP integration — RFC 6587 octet counting, real socket
+# ---------------------------------------------------------------------------
+
+def _octet_count_frame(payload: bytes) -> bytes:
+    """Wrap one RFC 5424 message in an RFC 6587 octet-counted frame."""
+    return str(len(payload)).encode("ascii") + b" " + payload
+
+
+async def _wait_for_persisted_message(message: str, attempts: int = 50):
+    """Poll the test database until a syslog row with this message appears."""
+    for _ in range(attempts):
+        await asyncio.sleep(0.05)
+        with TestSessionLocal() as session:
+            recent = EventPipelineService.get_recent_events(session, limit=20)
+            for event in recent:
+                if event.message == message:
+                    return event
+    return None
+
+
+class TestSyslogTCPIntegration:
+    """
+    Sends real TCP connections to a localhost listener on an ephemeral port.
+    Persistence uses the same in-memory SQLite session factory as the UDP test.
+    """
+
+    async def _start(self, monkeypatch, max_frame: int | None = None):
+        from backend.app.db.base import Base
+        from backend.tests.conftest import test_engine
+
+        Base.metadata.create_all(bind=test_engine)
+        monkeypatch.setattr(settings, "SYSLOG_TCP_HOST", "127.0.0.1")
+        monkeypatch.setattr(settings, "SYSLOG_TCP_PORT", 0)
+        if max_frame is not None:
+            monkeypatch.setattr(settings, "SYSLOG_TCP_MAX_FRAME_BYTES", max_frame)
+        monkeypatch.setattr(
+            "backend.app.services.syslog_listener.SessionLocal",
+            TestSessionLocal,
+        )
+        await start_syslog_tcp_listener()
+
+        import backend.app.services.syslog_listener as sl
+
+        server = sl._tcp_server
+        assert server is not None and server.sockets, "TCP listener failed to bind"
+        host, port = server.sockets[0].getsockname()[:2]
+        return host, port
+
+    @pytest.mark.asyncio
+    async def test_tcp_listener_persists_severity_and_source_ip(self, db_session, monkeypatch):
+        # PRI 35 → facility 4 (auth), severity 3 (ERROR) → high
+        # PRI 46 → facility 5 (syslog), severity 6 (INFO) → low
+        high_msg = "TCP syslog high severity event"
+        low_msg = "TCP syslog low severity event"
+        high = f"<35>1 - host sshd - - - {high_msg}".encode()
+        low = f"<46>1 - host app - - - {low_msg}".encode()
+        host, port = await self._start(monkeypatch)
+
+        try:
+            _reader, writer = await asyncio.open_connection(host, port)
+            writer.write(_octet_count_frame(high) + _octet_count_frame(low))
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+
+            high_event = await _wait_for_persisted_message(high_msg)
+            low_event = await _wait_for_persisted_message(low_msg)
+
+            assert high_event is not None, "High-severity TCP event was not persisted"
+            assert high_event.event_id.startswith("tiq-")
+            assert high_event.event_type == "syslog.auth.sshd"
+            assert high_event.severity == "high"
+            assert high_event.source_ip == "127.0.0.1"
+            assert high_event.attributes.get("syslog_severity_code") == 3
+
+            assert low_event is not None, "Low-severity TCP event was not persisted"
+            assert low_event.severity == "low"
+            assert low_event.source_ip == "127.0.0.1"
+            assert high_event.event_id != low_event.event_id
+        finally:
+            await stop_syslog_tcp_listener()
+
+    @pytest.mark.asyncio
+    async def test_tcp_malformed_frames_do_not_persist(self, db_session, monkeypatch):
+        good_msg = "TCP syslog recovered after malformed frame"
+        good = f"<35>1 - host sshd - - - {good_msg}".encode()
+        host, port = await self._start(monkeypatch, max_frame=128)
+
+        try:
+            # Non-octet-counted bytes: framing error closes this connection.
+            reader, writer = await asyncio.open_connection(host, port)
+            writer.write(b"this is not an octet-counted frame")
+            await writer.drain()
+            closed = await asyncio.wait_for(reader.read(64), timeout=2)
+            assert closed == b""
+            writer.close()
+            await writer.wait_closed()
+
+            # Declared length above the configured cap. Reject before parsing.
+            reader, writer = await asyncio.open_connection(host, port)
+            writer.write(b"129 " + (b"A" * 129))
+            await writer.drain()
+            closed = await asyncio.wait_for(reader.read(64), timeout=2)
+            assert closed == b""
+            writer.close()
+            await writer.wait_closed()
+
+            # Valid framing around a payload that is not RFC 5424, then a good frame.
+            reader, writer = await asyncio.open_connection(host, port)
+            writer.write(_octet_count_frame(b"not-a-syslog-message") + _octet_count_frame(good))
+            await writer.drain()
+            writer.close()
+            await writer.wait_closed()
+
+            recovered = await _wait_for_persisted_message(good_msg)
+            assert recovered is not None, "Valid frame after a bad payload was not persisted"
+            assert recovered.severity == "high"
+            assert recovered.source_ip == "127.0.0.1"
+
+            with TestSessionLocal() as session:
+                recent = EventPipelineService.get_recent_events(session, limit=20)
+            messages = [event.message for event in recent]
+            assert good_msg in messages
+            assert "not-a-syslog-message" not in messages
+            assert all("this is not an octet-counted frame" not in message for message in messages)
+        finally:
+            await stop_syslog_tcp_listener()
 
