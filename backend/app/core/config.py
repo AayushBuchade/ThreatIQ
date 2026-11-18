@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     SYSLOG_UDP_HOST: str = "127.0.0.1"
     SYSLOG_UDP_PORT: int = 5514
 
+    # Syslog TCP Listener Settings (RFC 6587 octet-counting, RFC 5424 payload)
+    SYSLOG_TCP_HOST: str = "127.0.0.1"
+    SYSLOG_TCP_PORT: int = 5515
+    # Upper bound on one octet-counted frame. Clamped again in the listener.
+    SYSLOG_TCP_MAX_FRAME_BYTES: int = 65_535
+
     # Enforcement of Zero-Destructive Action Rule
     ALLOW_DESTRUCTIVE_ACTIONS: bool = False
 

@@ -2,7 +2,8 @@
 Security Event Ingestion & Integration Test Endpoints
 """
 
-from fastapi import APIRouter, Depends, status
+from typing import Optional
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from backend.app.db.session import get_db
 from backend.app.schemas.security_event import (
@@ -66,11 +67,20 @@ def ingest_event(
     tags=["Events"]
 )
 def get_recent_events(
-    limit: int = 15,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    limit: int = Query(default=15, ge=1, le=100, description="Number of events to return (1–100)"),
+    severity: Optional[str] = Query(default=None, description="Filter by exact severity (low/medium/high/critical)"),
+    event_type: Optional[str] = Query(default=None, description="Filter by event_type substring (case-insensitive)"),
+    source_ip: Optional[str] = Query(default=None, description="Filter by exact source IP address"),
 ) -> RecentEventsResponse:
-    """Returns recent events persisted in database."""
-    events = EventPipelineService.get_recent_events(db=db, limit=limit)
+    """Returns recent events persisted in database with optional filters."""
+    events = EventPipelineService.get_recent_events(
+        db=db,
+        limit=limit,
+        severity=severity,
+        event_type=event_type,
+        source_ip=source_ip,
+    )
     return RecentEventsResponse(
         total=len(events),
         events=[SecurityEventResponse.model_validate(e) for e in events]
