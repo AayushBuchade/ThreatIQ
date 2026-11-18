@@ -5,12 +5,13 @@ Manages event persistence, database transactions, and telemetry queries.
 
 import uuid
 import time
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from backend.app.models.security_event import SecurityEvent
 from backend.app.schemas.security_event import SecurityEventCreate
 from backend.app.core.logging import logger
+from backend.app.core.normalization import normalize_event
 
 
 class EventPipelineService:
@@ -26,6 +27,9 @@ class EventPipelineService:
         Persists a security event to PostgreSQL/SQLite, measuring DB write latency.
         Returns the saved model and roundtrip latency in ms.
         """
+        # Normalise field values before persistence
+        event_in = normalize_event(event_in)
+
         start_time = time.perf_counter()
         event_uuid = f"tiq-{uuid.uuid4().hex[:12]}"
 
@@ -54,9 +58,28 @@ class EventPipelineService:
     @staticmethod
     def get_recent_events(
         db: Session,
-        limit: int = 15
+        limit: int = 15,
+        severity: Optional[str] = None,
+        event_type: Optional[str] = None,
+        source_ip: Optional[str] = None,
     ) -> List[SecurityEvent]:
-        """Queries the most recent security events from database ordered by created_at desc."""
+        """Queries the most recent security events from database ordered by created_at desc.
+
+        Optional filters:
+            severity  — exact match (case-insensitive)
+            event_type — substring match (case-insensitive)
+            source_ip  — exact match
+        """
         stmt = select(SecurityEvent).order_by(desc(SecurityEvent.created_at)).limit(limit)
+
+        if severity is not None:
+            stmt = stmt.where(func.lower(SecurityEvent.severity) == severity.strip().lower())
+
+        if event_type is not None:
+            stmt = stmt.where(func.lower(SecurityEvent.event_type).contains(event_type.strip().lower()))
+
+        if source_ip is not None:
+            stmt = stmt.where(SecurityEvent.source_ip == source_ip.strip())
+
         result = db.execute(stmt)
         return list(result.scalars().all())
