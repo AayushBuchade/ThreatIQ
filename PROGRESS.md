@@ -134,3 +134,17 @@ backend/tests/test_system.py::test_system_modules_endpoint PASSED        [100%]
 - **Phase 0 Actual Status:** Completed
 - **Next Milestone:** Phase 1 (Security Ingestion & Monitoring — 8–12 days)
 
+---
+
+## 6. Phase 1 — Redis Streams producer (best-effort)
+
+Normalized events are published from `EventPipelineService.ingest_event` only, after the database commit. `REDIS_STREAMS_ENABLED` defaults to false. Docker Compose sets it true with stream `threatiq:events:normalized`. Publish uses a 0.5s socket timeout, logs failures, and does not roll back the row. No outbox.
+
+Command:
+
+```text
+.venv\Scripts\python.exe -m pytest backend/tests -q --tb=line
+```
+
+Result: **123 passed, 6 warnings in 12.66s**. Warnings are the existing Starlette deprecation and scikit-learn unpickle version notices. Consumer groups are not implemented. T1.3 remains **In Progress**.
+

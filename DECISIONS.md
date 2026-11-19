@@ -14,6 +14,7 @@
 - [ADR-004: Decoupling ML Training from Streaming Inference](#adr-004-decoupling-ml-training-from-streaming-inference)
 - [ADR-005: Strict Non-Destructive Security Guarantee](#adr-005-strict-non-destructive-security-guarantee)
 - [ADR-006: Dual Database Driver Support (PostgreSQL / SQLite)](#adr-006-dual-database-driver-support-postgresql--sqlite)
+- [ADR-007: Best-Effort Redis Streams Publish After Commit](#adr-007-best-effort-redis-streams-publish-after-commit)
 
 ---
 
@@ -110,4 +111,18 @@ Using SQLAlchemy 2.0 abstractions, ThreatIQ natively supports:
 
 #### Consequences
 - Complete developer flexibility, instant CI test execution, and seamless production readiness.
+
+---
+
+### ADR-007: Best-Effort Redis Streams Publish After Commit
+
+#### Context
+Normalized REST, UDP, and TCP events are already stored by `EventPipelineService.ingest_event`. Downstream workers need a stream entry, but Redis is optional and must not block or undo a successful database write.
+
+#### Decision
+After the database commit, one publisher appends the normalized event to `REDIS_STREAM_NAME` (default `threatiq:events:normalized`) using `REDIS_URL`. The entry includes `event_id` so consumers can deduplicate. Publishing is off unless `REDIS_STREAMS_ENABLED` is true. Socket connect and command timeouts are 0.5 seconds. Failures are logged and swallowed. There is no transactional outbox and no retry loop, so delivery is not guaranteed.
+
+#### Consequences
+- **Positive:** One publish path for every ingestion source. Database ingestion still succeeds when Redis is disabled or unreachable. Hybrid in-process normalization and ML boundaries stay unchanged.
+- **Negative:** A crash between commit and `XADD`, or a Redis outage, can leave a persisted event off the stream until a later consumer reads the database.
 

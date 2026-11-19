@@ -31,7 +31,7 @@
 |:---:|---|:---:|:---:|
 | **T1.1** | Implement asynchronous Syslog (RFC 5424 / RFC 3164) listener over UDP/TCP | Module 1 | **Upcoming** |
 | **T1.2** | Build CEF (Common Event Format) parser and ECS normalization engine | Module 1 | **Upcoming** |
-| **T1.3** | Implement Redis Streams producer and consumer group workers | Module 1 | **Upcoming** |
+| **T1.3** | Implement Redis Streams producer and consumer group workers | Module 1 | **In Progress** |
 | **T1.4** | Configure WebSockets endpoint (`/ws/telemetry`) for streaming live events to UI | Module 1 | **Upcoming** |
 | **T1.5** | Implement rate limiting and backpressure protection on ingestion endpoints | Module 1 | **Upcoming** |
 | **T1.6** | Build React live telemetry event stream viewer with filter controls | Module 1 | **Upcoming** |

@@ -13,6 +13,8 @@ services:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/threatiq
       - SYNC_DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/threatiq
       - REDIS_URL=redis://redis:6379/0
+      - REDIS_STREAMS_ENABLED=true
+      - REDIS_STREAM_NAME=threatiq:events:normalized
       - SECRET_KEY=threatiq-production-secret-change-before-deployment
       - ALLOW_DESTRUCTIVE_ACTIONS=false
     depends_on:

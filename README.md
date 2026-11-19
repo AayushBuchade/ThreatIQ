@@ -156,7 +156,7 @@ flowchart TD
 Upon architecture sign-off and approval to proceed:
 1. **Multi-Source Ingestion Listeners:** Implement UDP/TCP Syslog (RFC 5424/3164) listener daemon.
 2. **ECS Event Normalization:** Build CEF parsing and Elastic Common Schema mapping engine.
-3. **Redis Streams Ingestion Bus:** Configure consumer groups with persistent offsets and backpressure controls.
+3. **Redis Streams Ingestion Bus:** Best-effort publish of normalized events is in place (`threatiq:events:normalized`, `event_id` for dedup). Consumer groups, offsets, and backpressure are still to build. There is no outbox, so delivery is not guaranteed.
 4. **WebSocket Telemetry Stream:** Build `/ws/telemetry` for live SOC event push to React dashboard.
 5. **Interactive Telemetry Viewer:** Build React live stream viewer with severity filtering.
 
