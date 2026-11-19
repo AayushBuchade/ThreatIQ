@@ -12,6 +12,7 @@ from backend.app.models.security_event import SecurityEvent
 from backend.app.schemas.security_event import SecurityEventCreate
 from backend.app.core.logging import logger
 from backend.app.core.normalization import normalize_event
+from backend.app.services.redis_streams import publish_normalized_event
 
 
 class EventPipelineService:
@@ -53,6 +54,9 @@ class EventPipelineService:
         logger.info(
             f"Security event persisted: {db_event.event_id} ({db_event.event_type}) in {roundtrip_ms}ms"
         )
+        # Single publish path for REST, UDP, and TCP. Best-effort only:
+        # Redis failures are logged and do not undo the committed row.
+        publish_normalized_event(db_event)
         return db_event, roundtrip_ms
 
     @staticmethod

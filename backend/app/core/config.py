@@ -21,8 +21,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./threatiq.db"
     SYNC_DATABASE_URL: str = "sqlite:///./threatiq.db"
 
-    # Redis Streaming Settings
+    # Redis Streams (optional, best-effort). Disabled unless explicitly turned on
+    # so local SQLite development and tests do not require a running Redis.
+    # There is no transactional outbox: a crash after the DB commit can drop
+    # the stream entry. Do not treat publish success as guaranteed delivery.
+    REDIS_STREAMS_ENABLED: bool = False
     REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_STREAM_NAME: str = "threatiq:events:normalized"
 
     # Security Settings
     SECRET_KEY: str = "threatiq-insecure-development-secret-key-change-in-prod"

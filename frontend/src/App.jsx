@@ -11,16 +11,12 @@ export default function App() {
   const [healthData, setHealthData] = useState(null);
   const [systemStatus, setSystemStatus] = useState(null);
   const [modules, setModules] = useState([]);
-  const criticalCount = recentEvents.filter(
-  event => event.severity === 'critical'
-).length;
-
-const highCount = recentEvents.filter(
-  event => event.severity === 'high'
-).length;
   const [recentEvents, setRecentEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const criticalCount = recentEvents.filter(event => event.severity === 'critical').length;
+  const highCount = recentEvents.filter(event => event.severity === 'high').length;
 
   const loadAllData = async () => {
     setLoading(true);

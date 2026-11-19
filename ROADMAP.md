@@ -72,7 +72,7 @@
 - **Key Deliverables:**
   - Syslog (RFC 5424 / RFC 3164) listener over UDP/TCP.
   - Common Event Format (CEF) and Elastic Common Schema (ECS) standardizers.
-  - Redis Streams ingestion bus (`threatiq:events:raw`, `threatiq:events:normalized`).
+  - Redis Streams ingestion bus (`threatiq:events:raw`, `threatiq:events:normalized`). Best-effort normalized producer is in place; consumer groups and an outbox are not.
   - Real-time WebSocket event dispatch to React telemetry viewer.
   - Ingestion rate limiter and defensive backpressure controls.
 
