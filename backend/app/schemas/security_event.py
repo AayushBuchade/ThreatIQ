@@ -26,6 +26,7 @@ class SecurityEventResponse(BaseModel):
     message: str
     attributes: Dict[str, Any]
     created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -41,3 +42,10 @@ class TestPingResponse(BaseModel):
 class RecentEventsResponse(BaseModel):
     total: int
     events: List[SecurityEventResponse]
+
+
+class EventSummaryResponse(BaseModel):
+    """Database counts. Independent of the recent-events page size."""
+
+    total: int
+    by_severity: Dict[str, int]

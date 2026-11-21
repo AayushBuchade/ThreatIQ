@@ -158,7 +158,7 @@ Upon architecture sign-off and approval to proceed:
 2. **ECS Event Normalization:** Build CEF parsing and Elastic Common Schema mapping engine.
 3. **Redis Streams Ingestion Bus:** Best-effort publish of normalized events is in place (`threatiq:events:normalized`, `event_id` for dedup). Consumer groups, offsets, and backpressure are still to build. There is no outbox, so delivery is not guaranteed.
 4. **WebSocket Telemetry Stream:** Build `/ws/telemetry` for live SOC event push to React dashboard.
-5. **Interactive Telemetry Viewer:** Build React live stream viewer with severity filtering.
+5. **Interactive Telemetry Viewer:** Live Monitoring is in the console (search, filters, 5-second refresh, investigation drawer). WebSocket push is still to build. The table shows at most 100 recent matches; counts come from the full database.
 
 ---
 

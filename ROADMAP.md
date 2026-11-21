@@ -73,7 +73,7 @@
   - Syslog (RFC 5424 / RFC 3164) listener over UDP/TCP.
   - Common Event Format (CEF) and Elastic Common Schema (ECS) standardizers.
   - Redis Streams ingestion bus (`threatiq:events:raw`, `threatiq:events:normalized`). Best-effort normalized producer is in place; consumer groups and an outbox are not.
-  - Real-time WebSocket event dispatch to React telemetry viewer.
+  - Real-time WebSocket event dispatch to React telemetry viewer. Live Monitoring currently polls `/events/recent` and `/events/summary` every 5 seconds.
   - Ingestion rate limiter and defensive backpressure controls.
 
 ### Phase 2: AI Anomaly Detection (10–15 days) — [UPCOMING]

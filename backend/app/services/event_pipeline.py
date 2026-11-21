@@ -7,7 +7,7 @@ import uuid
 import time
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc, func, or_
 from backend.app.models.security_event import SecurityEvent
 from backend.app.schemas.security_event import SecurityEventCreate
 from backend.app.core.logging import logger
@@ -60,12 +60,55 @@ class EventPipelineService:
         return db_event, roundtrip_ms
 
     @staticmethod
+    def _apply_event_filters(
+        stmt,
+        severity: Optional[str] = None,
+        event_type: Optional[str] = None,
+        source_ip: Optional[str] = None,
+        q: Optional[str] = None,
+    ):
+        """Shared WHERE clause for the recent page and the unpaged summary."""
+        if severity is not None:
+            stmt = stmt.where(func.lower(SecurityEvent.severity) == severity.strip().lower())
+
+        if event_type is not None:
+            stmt = stmt.where(
+                func.lower(SecurityEvent.event_type).contains(event_type.strip().lower())
+            )
+
+        if source_ip is not None:
+            stmt = stmt.where(SecurityEvent.source_ip == source_ip.strip())
+
+        if q is not None and q.strip():
+            escaped = (
+                q.strip()
+                .lower()
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
+            pattern = f"%{escaped}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(SecurityEvent.event_id).like(pattern, escape="\\"),
+                    func.lower(SecurityEvent.event_type).like(pattern, escape="\\"),
+                    func.lower(SecurityEvent.message).like(pattern, escape="\\"),
+                    func.lower(func.coalesce(SecurityEvent.source_ip, "")).like(pattern, escape="\\"),
+                    func.lower(func.coalesce(SecurityEvent.destination_ip, "")).like(
+                        pattern, escape="\\"
+                    ),
+                )
+            )
+        return stmt
+
+    @staticmethod
     def get_recent_events(
         db: Session,
         limit: int = 15,
         severity: Optional[str] = None,
         event_type: Optional[str] = None,
         source_ip: Optional[str] = None,
+        q: Optional[str] = None,
     ) -> List[SecurityEvent]:
         """Queries the most recent security events from database ordered by created_at desc.
 
@@ -73,17 +116,48 @@ class EventPipelineService:
             severity  — exact match (case-insensitive)
             event_type — substring match (case-insensitive)
             source_ip  — exact match
+            q — substring match across id, type, message, and IP fields
         """
-        stmt = select(SecurityEvent).order_by(desc(SecurityEvent.created_at)).limit(limit)
-
-        if severity is not None:
-            stmt = stmt.where(func.lower(SecurityEvent.severity) == severity.strip().lower())
-
-        if event_type is not None:
-            stmt = stmt.where(func.lower(SecurityEvent.event_type).contains(event_type.strip().lower()))
-
-        if source_ip is not None:
-            stmt = stmt.where(SecurityEvent.source_ip == source_ip.strip())
-
+        stmt = select(SecurityEvent)
+        stmt = EventPipelineService._apply_event_filters(
+            stmt,
+            severity=severity,
+            event_type=event_type,
+            source_ip=source_ip,
+            q=q,
+        )
+        stmt = stmt.order_by(desc(SecurityEvent.created_at)).limit(limit)
         result = db.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    def get_event_summary(
+        db: Session,
+        severity: Optional[str] = None,
+        event_type: Optional[str] = None,
+        source_ip: Optional[str] = None,
+        q: Optional[str] = None,
+    ) -> dict:
+        """Count stored events. This is not limited to the recent-events page."""
+        stmt = select(SecurityEvent.severity, func.count(SecurityEvent.id))
+        stmt = EventPipelineService._apply_event_filters(
+            stmt,
+            severity=severity,
+            event_type=event_type,
+            source_ip=source_ip,
+            q=q,
+        )
+        stmt = stmt.group_by(SecurityEvent.severity)
+        rows = db.execute(stmt).all()
+
+        by_severity = {"low": 0, "medium": 0, "high": 0, "critical": 0, "other": 0}
+        total = 0
+        for severity_value, count in rows:
+            amount = int(count)
+            total += amount
+            key = (severity_value or "").strip().lower()
+            if key in ("low", "medium", "high", "critical"):
+                by_severity[key] += amount
+            else:
+                by_severity["other"] += amount
+        return {"total": total, "by_severity": by_severity}

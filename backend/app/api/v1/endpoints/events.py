@@ -11,6 +11,7 @@ from backend.app.schemas.security_event import (
     SecurityEventResponse,
     TestPingResponse,
     RecentEventsResponse,
+    EventSummaryResponse,
 )
 from backend.app.services.event_pipeline import EventPipelineService
 
@@ -62,6 +63,29 @@ def ingest_event(
 
 
 @router.get(
+    "/events/summary",
+    response_model=EventSummaryResponse,
+    tags=["Events"]
+)
+def get_event_summary(
+    db: Session = Depends(get_db),
+    severity: Optional[str] = Query(default=None, description="Filter by exact severity (low/medium/high/critical)"),
+    event_type: Optional[str] = Query(default=None, description="Filter by event_type substring (case-insensitive)"),
+    source_ip: Optional[str] = Query(default=None, description="Filter by exact source IP address"),
+    q: Optional[str] = Query(default=None, description="Search id, type, message, and IP fields"),
+) -> EventSummaryResponse:
+    """Returns full stored counts. Not limited to the recent-events page."""
+    summary = EventPipelineService.get_event_summary(
+        db=db,
+        severity=severity,
+        event_type=event_type,
+        source_ip=source_ip,
+        q=q,
+    )
+    return EventSummaryResponse.model_validate(summary)
+
+
+@router.get(
     "/events/recent",
     response_model=RecentEventsResponse,
     tags=["Events"]
@@ -72,14 +96,16 @@ def get_recent_events(
     severity: Optional[str] = Query(default=None, description="Filter by exact severity (low/medium/high/critical)"),
     event_type: Optional[str] = Query(default=None, description="Filter by event_type substring (case-insensitive)"),
     source_ip: Optional[str] = Query(default=None, description="Filter by exact source IP address"),
+    q: Optional[str] = Query(default=None, description="Search id, type, message, and IP fields"),
 ) -> RecentEventsResponse:
-    """Returns recent events persisted in database with optional filters."""
+    """Returns a recent page. `total` is the page length, not the stored inventory."""
     events = EventPipelineService.get_recent_events(
         db=db,
         limit=limit,
         severity=severity,
         event_type=event_type,
         source_ip=source_ip,
+        q=q,
     )
     return RecentEventsResponse(
         total=len(events),
