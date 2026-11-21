@@ -134,11 +134,26 @@ export default function Sidebar({ currentSection = 'overview', onNavigate }) {
                 >
                   <div className="flex items-center space-x-2.5">
                     <Terminal className={`w-4 h-4 ${activeSection === 'events' ? 'text-cyan-400' : 'text-slate-400'}`} />
-                    <span>Log Monitoring</span>
+                    <span>Live Monitoring</span>
                   </div>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800/60 font-mono">
-                    RFC 5424
+                    Live
                   </span>
+                </a>
+
+                <a
+                  href="#developer"
+                  onClick={() => handleLinkClick('developer')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                    activeSection === 'developer'
+                      ? 'bg-slate-800 text-slate-200 border border-slate-700'
+                      : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/40 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Activity className="w-4 h-4 text-slate-500" />
+                    <span>Developer tools</span>
+                  </div>
                 </a>
               </nav>
             </div>

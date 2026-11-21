@@ -43,10 +43,37 @@ export async function sendTelemetryPing(sampleData = {}) {
   return response.json();
 }
 
-export async function fetchRecentEvents() {
-  const response = await fetch(`${API_BASE}/events/recent`);
+function eventQuery(params = {}, { includeLimit = false } = {}) {
+  const query = new URLSearchParams();
+  if (includeLimit && params.limit) query.set('limit', String(params.limit));
+  if (params.severity) query.set('severity', params.severity);
+  if (params.eventType) query.set('event_type', params.eventType);
+  if (params.sourceIp) query.set('source_ip', params.sourceIp);
+  if (params.q) query.set('q', params.q);
+  const text = query.toString();
+  return text ? `?${text}` : '';
+}
+
+export async function fetchRecentEvents(params = {}) {
+  const response = await fetch(`${API_BASE}/events/recent${eventQuery(params, { includeLimit: true })}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch recent events: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchEventAnomaly(eventId) {
+  const response = await fetch(`${API_BASE}/events/${encodeURIComponent(eventId)}/anomaly`);
+  if (!response.ok) {
+    throw new Error(`Failed to assess anomaly: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchEventSummary(params = {}) {
+  const response = await fetch(`${API_BASE}/events/summary${eventQuery(params)}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch event summary: ${response.status}`);
   }
   return response.json();
 }

@@ -70,3 +70,51 @@ def test_event_validation_error(client: TestClient):
 
     response = client.post("/api/v1/events/test-ping", json=invalid_payload)
     assert response.status_code == 422
+
+
+def _ingest(client: TestClient, **overrides) -> dict:
+    payload = {
+        "event_type": "auth.login.failed",
+        "severity": "high",
+        "source_ip": "203.0.113.8",
+        "message": "failed password for root",
+    }
+    payload.update(overrides)
+    response = client.post("/api/v1/events/ingest", json=payload)
+    assert response.status_code == 202, response.text
+    return response.json()
+
+
+def test_summary_counts_are_not_limited_to_the_recent_page(client: TestClient):
+    _ingest(client, severity="critical", message="first critical")
+    _ingest(client, severity="high", message="second high")
+    _ingest(client, severity="low", event_type="network.scan", message="third low")
+
+    recent = client.get("/api/v1/events/recent?limit=1")
+    assert recent.status_code == 200
+    assert recent.json()["total"] == 1
+
+    summary = client.get("/api/v1/events/summary")
+    assert summary.status_code == 200
+    body = summary.json()
+    assert body["total"] == 3
+    assert body["by_severity"]["critical"] == 1
+    assert body["by_severity"]["high"] == 1
+    assert body["by_severity"]["low"] == 1
+    assert body["by_severity"]["medium"] == 0
+
+
+def test_summary_and_recent_search_share_filters(client: TestClient):
+    _ingest(client, message="ssh login failure from edge router", source_ip="198.51.100.9")
+    _ingest(client, event_type="network.port_scan", severity="medium", message="unrelated scan")
+
+    summary = client.get("/api/v1/events/summary?q=edge%20router&severity=high")
+    assert summary.status_code == 200
+    assert summary.json()["total"] == 1
+    assert summary.json()["by_severity"]["high"] == 1
+
+    recent = client.get("/api/v1/events/recent?q=198.51.100.9")
+    assert recent.status_code == 200
+    assert recent.json()["total"] == 1
+    assert recent.json()["events"][0]["source_ip"] == "198.51.100.9"
+    assert recent.json()["events"][0]["updated_at"]

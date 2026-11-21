@@ -148,3 +148,33 @@ Command:
 
 Result: **123 passed, 6 warnings in 12.66s**. Warnings are the existing Starlette deprecation and scikit-learn unpickle version notices. Consumer groups are not implemented. T1.3 remains **In Progress**.
 
+---
+
+## 7. Phase 1 — Live Monitoring page
+
+`GET /api/v1/events/summary` returns full stored counts and a severity breakdown. `GET /api/v1/events/recent` still returns a page of at most 100 rows; its `total` is the page length. The Live Monitoring view uses the summary for inventory counts and labels the table as a recent page. Test-event controls moved to `#developer`.
+
+Commands:
+
+```text
+.venv\Scripts\python.exe -m pytest backend/tests -q --tb=line
+npm run build
+```
+
+Results: **125 passed, 6 warnings in 13.67s**. Frontend production build succeeded (`1491 modules`, `dist/assets/index-iCUPrJmC.js`). Browser check on `http://127.0.0.1:5173/#events` confirmed filters, search, pause/resume, the investigation drawer, and that dashboard totals stayed at the database count (6 stored, 3 critical, 0 high, 2 medium, 1 low) while a search showed 1 match. There is no frontend unit-test runner. The table cannot page past 100 events. WebSocket streaming is not implemented.
+
+---
+
+## 8. Phase 1 — On-demand Isolation Forest
+
+`GET /api/v1/events/{event_id}/anomaly` fits scikit-learn `IsolationForest` on earlier stored events only. The scored event is not a training row. Fewer than 25 earlier events returns `insufficient_data` with no score. The result is not written to `severity` or `threat_score`. Live Monitoring shows Not evaluated until a row is opened, then Normal, Anomalous, or Not evaluated when history is too short.
+
+Command:
+
+```text
+.venv\Scripts\python.exe -m pytest backend/tests -q --tb=line
+npm run build
+```
+
+Results: **128 passed, 6 warnings in 1.57s**. Frontend build succeeded (`dist/assets/index-iBg365vk.js`). A local event with 5 earlier rows returned `insufficient_data`, model `threatiq-iforest-1.0.0`, and left `threat_score` at 0. The focused test also scored a later failed-login burst as anomalous with a lower decision score than a routine heartbeat. This is not the offline serialized Phase 2 pipeline. T2.1 remains **Upcoming**.
+

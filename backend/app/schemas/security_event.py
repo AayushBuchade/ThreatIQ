@@ -26,6 +26,7 @@ class SecurityEventResponse(BaseModel):
     message: str
     attributes: Dict[str, Any]
     created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -41,3 +42,32 @@ class TestPingResponse(BaseModel):
 class RecentEventsResponse(BaseModel):
     total: int
     events: List[SecurityEventResponse]
+
+
+class EventSummaryResponse(BaseModel):
+    """Database counts. Independent of the recent-events page size."""
+
+    total: int
+    by_severity: Dict[str, int]
+
+
+class FeatureEvidence(BaseModel):
+    name: str
+    value: float
+    training_mean: float
+    z_score: Optional[float] = None
+    note: Optional[str] = None
+
+
+class AnomalyAssessmentResponse(BaseModel):
+    """Isolation Forest result. Not a severity and not the stored threat score."""
+
+    event_id: str
+    evaluated: bool
+    status: str
+    model_score: Optional[float] = None
+    model_version: str
+    training_events: int
+    minimum_training_events: int
+    feature_evidence: List[FeatureEvidence] = Field(default_factory=list)
+    detail: str
