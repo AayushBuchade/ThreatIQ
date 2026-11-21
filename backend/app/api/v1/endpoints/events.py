@@ -3,7 +3,7 @@ Security Event Ingestion & Integration Test Endpoints
 """
 
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from backend.app.db.session import get_db
 from backend.app.schemas.security_event import (
@@ -12,7 +12,9 @@ from backend.app.schemas.security_event import (
     TestPingResponse,
     RecentEventsResponse,
     EventSummaryResponse,
+    AnomalyAssessmentResponse,
 )
+from backend.app.services.anomaly_detector import assess_event
 from backend.app.services.event_pipeline import EventPipelineService
 
 router = APIRouter()
@@ -111,3 +113,19 @@ def get_recent_events(
         total=len(events),
         events=[SecurityEventResponse.model_validate(e) for e in events]
     )
+
+
+@router.get(
+    "/events/{event_id}/anomaly",
+    response_model=AnomalyAssessmentResponse,
+    tags=["Events"],
+)
+def get_event_anomaly(
+    event_id: str,
+    db: Session = Depends(get_db),
+) -> AnomalyAssessmentResponse:
+    """Score one stored event with Isolation Forest. Does not change the row."""
+    assessment = assess_event(db, event_id)
+    if assessment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    return AnomalyAssessmentResponse.model_validate(assessment)

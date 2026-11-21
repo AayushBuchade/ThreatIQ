@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Pause, Play, RefreshCw, Search, X } from 'lucide-react';
-import { fetchEventSummary, fetchRecentEvents } from '../services/api';
+import { fetchEventAnomaly, fetchEventSummary, fetchRecentEvents } from '../services/api';
 
 const PAGE_LIMIT = 100;
 const REFRESH_MS = 5000;
@@ -54,6 +54,12 @@ export default function LiveMonitoring() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
+  const [assessments, setAssessments] = useState({});
+  const assessmentsRef = useRef({});
+  const anomalyRequests = useRef(new Set());
+  useEffect(() => {
+    assessmentsRef.current = assessments;
+  }, [assessments]);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(searchInput.trim()), 300);
@@ -108,6 +114,28 @@ export default function LiveMonitoring() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [selected]);
+
+  useEffect(() => {
+    const eventId = selected?.event_id;
+    if (!eventId) return undefined;
+    if (assessmentsRef.current[eventId] || anomalyRequests.current.has(eventId)) return undefined;
+    anomalyRequests.current.add(eventId);
+    setAssessments((current) => ({ ...current, [eventId]: { status: 'loading', evaluated: false } }));
+    fetchEventAnomaly(eventId)
+      .then((result) => {
+        setAssessments((current) => ({ ...current, [eventId]: result }));
+      })
+      .catch((err) => {
+        setAssessments((current) => ({
+          ...current,
+          [eventId]: { status: 'error', evaluated: false, detail: err.message },
+        }));
+      })
+      .finally(() => {
+        anomalyRequests.current.delete(eventId);
+      });
+    return undefined;
   }, [selected]);
 
   const filtersActive = Boolean(severity || eventType.trim() || sourceIp.trim() || search);
@@ -255,12 +283,13 @@ export default function LiveMonitoring() {
                 <th className="px-4 py-3 font-medium">Source IP</th>
                 <th className="px-4 py-3 font-medium">Message</th>
                 <th className="px-4 py-3 font-medium">Event ID</th>
+                <th className="px-4 py-3 font-medium">Anomaly</th>
               </tr>
             </thead>
             <tbody>
               {events.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-500">
                     {loading ? 'Loading stored events…' : 'No stored events match these filters.'}
                   </td>
                 </tr>
@@ -276,6 +305,7 @@ export default function LiveMonitoring() {
                   <td className="px-4 py-3 font-mono text-slate-300">{event.source_ip || '—'}</td>
                   <td className="px-4 py-3 text-slate-300 max-w-xs truncate">{event.message}</td>
                   <td className="px-4 py-3 font-mono text-slate-500">{event.event_id}</td>
+                  <td className="px-4 py-3"><AnomalyPill assessment={assessments[event.event_id]} /></td>
                 </tr>
               ))}
             </tbody>
@@ -300,6 +330,7 @@ export default function LiveMonitoring() {
               </div>
               <p className="text-xs text-slate-300">{event.message}</p>
               <p className="text-[11px] text-slate-500">{event.source_ip || 'No source IP'} · {formatTimestamp(event.created_at)}</p>
+              <AnomalyPill assessment={assessments[event.event_id]} />
             </button>
           ))}
         </div>
@@ -342,7 +373,8 @@ export default function LiveMonitoring() {
                 label="Stored threat score"
                 value={selected.threat_score === null || selected.threat_score === undefined ? '—' : String(selected.threat_score)}
               />
-              <p className="text-[11px] text-slate-500 -mt-2">Saved with the event. This is not a live model score.</p>
+              <p className="text-[11px] text-slate-500 -mt-2">Saved at ingest. This is not the Isolation Forest score.</p>
+              <AnomalyPanel assessment={assessments[selected.event_id]} />
               <Detail label="Created" value={formatTimestamp(selected.created_at)} />
               <Detail label="Updated" value={formatTimestamp(selected.updated_at)} />
               <div>
@@ -364,6 +396,84 @@ export default function LiveMonitoring() {
         </div>
       )}
     </section>
+  );
+}
+
+function anomalyLabel(assessment) {
+  if (!assessment || assessment.status === 'loading') return { text: 'Not evaluated', tone: 'bg-slate-800 text-slate-400 border-slate-700' };
+  if (assessment.status === 'error') return { text: 'Not evaluated', tone: 'bg-slate-800 text-slate-400 border-slate-700' };
+  if (!assessment.evaluated || assessment.status === 'insufficient_data') {
+    return { text: 'Not evaluated', tone: 'bg-slate-800 text-slate-300 border-slate-600' };
+  }
+  if (assessment.status === 'anomalous') return { text: 'Anomalous', tone: 'bg-rose-500/15 text-rose-300 border-rose-500/40' };
+  if (assessment.status === 'normal') return { text: 'Normal', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' };
+  return { text: 'Not evaluated', tone: 'bg-slate-800 text-slate-400 border-slate-700' };
+}
+
+function AnomalyPill({ assessment }) {
+  const label = anomalyLabel(assessment);
+  return (
+    <span className={`inline-flex px-2 py-0.5 rounded border text-[10px] font-semibold uppercase tracking-wide ${label.tone}`}>
+      {label.text}
+    </span>
+  );
+}
+
+function AnomalyPanel({ assessment }) {
+  const label = anomalyLabel(assessment);
+  const evaluated = Boolean(assessment?.evaluated);
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-wide text-slate-500">Isolation Forest</p>
+        <AnomalyPill assessment={assessment} />
+      </div>
+      <p className="text-xs text-slate-300">
+        {evaluated ? 'Evaluated against earlier events only.' : 'Not evaluated. No anomaly decision was made.'}
+      </p>
+      {!assessment || assessment.status === 'loading' ? (
+        <p className="text-xs text-slate-500">Scoring this event against stored history…</p>
+      ) : null}
+      {assessment?.status === 'error' ? (
+        <p className="text-xs text-rose-300">{assessment.detail}</p>
+      ) : null}
+      {assessment && assessment.status !== 'loading' && assessment.status !== 'error' ? (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-400">{assessment.detail}</p>
+          <p className="text-[11px] font-mono text-slate-500">
+            Model {assessment.model_version} · training events {assessment.training_events}/{assessment.minimum_training_events}
+            {evaluated ? ` · score ${assessment.model_score}` : ''}
+          </p>
+          {evaluated && assessment.feature_evidence?.length > 0 ? (
+            <div className="max-h-48 overflow-y-auto border border-slate-800 rounded-md">
+              <table className="w-full text-left text-[11px]">
+                <thead className="text-slate-500">
+                  <tr>
+                    <th className="px-2 py-1 font-medium">Feature</th>
+                    <th className="px-2 py-1 font-medium">Value</th>
+                    <th className="px-2 py-1 font-medium">Train mean</th>
+                    <th className="px-2 py-1 font-medium">z</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assessment.feature_evidence.map((feature) => (
+                    <tr key={feature.name} className="border-t border-slate-800 text-slate-300">
+                      <td className="px-2 py-1 font-mono">{feature.name}</td>
+                      <td className="px-2 py-1 font-mono">{feature.value}</td>
+                      <td className="px-2 py-1 font-mono">{feature.training_mean}</td>
+                      <td className="px-2 py-1 font-mono">{feature.z_score === null || feature.z_score === undefined ? '—' : feature.z_score}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      <p className={`text-[10px] ${label.text === 'Anomalous' ? 'text-rose-300' : 'text-slate-500'}`}>
+        This model result does not change severity or the stored threat score.
+      </p>
+    </div>
   );
 }
 

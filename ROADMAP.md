@@ -79,7 +79,7 @@
 ### Phase 2: AI Anomaly Detection (10–15 days) — [UPCOMING]
 - **Target:** Module 2 (AI Anomaly Detection)
 - **Key Deliverables:**
-  - Unsupervised `IsolationForest` pipeline for tabular security logs.
+  - Unsupervised `IsolationForest` pipeline for tabular security logs. An on-demand scorer exists for one stored event; offline training and a persisted model do not.
   - Feature extraction: temporal cyclical metrics, login failure velocity, egress ratios.
   - Outlier scoring and automatic anomaly thresholding.
   - Model serialization manifest and drift monitoring.

@@ -62,6 +62,14 @@ export async function fetchRecentEvents(params = {}) {
   return response.json();
 }
 
+export async function fetchEventAnomaly(eventId) {
+  const response = await fetch(`${API_BASE}/events/${encodeURIComponent(eventId)}/anomaly`);
+  if (!response.ok) {
+    throw new Error(`Failed to assess anomaly: ${response.status}`);
+  }
+  return response.json();
+}
+
 export async function fetchEventSummary(params = {}) {
   const response = await fetch(`${API_BASE}/events/summary${eventQuery(params)}`);
   if (!response.ok) {
