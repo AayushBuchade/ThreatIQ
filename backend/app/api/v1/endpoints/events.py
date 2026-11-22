@@ -13,8 +13,9 @@ from backend.app.schemas.security_event import (
     RecentEventsResponse,
     EventSummaryResponse,
     AnomalyAssessmentResponse,
+    AnomalyEvaluationResponse,
 )
-from backend.app.services.anomaly_detector import assess_event
+from backend.app.services.anomaly_detector import assess_event, evaluate_labeled_events
 from backend.app.services.event_pipeline import EventPipelineService
 
 router = APIRouter()
@@ -113,6 +114,28 @@ def get_recent_events(
         total=len(events),
         events=[SecurityEventResponse.model_validate(e) for e in events]
     )
+
+
+@router.get(
+    "/events/anomaly-evaluation",
+    response_model=AnomalyEvaluationResponse,
+    tags=["Events"],
+)
+def get_anomaly_evaluation(db: Session = Depends(get_db)) -> AnomalyEvaluationResponse:
+    """Calculate precision, recall, F1, and a confusion matrix only for supplied labels."""
+    try:
+        result = evaluate_labeled_events(db)
+    except Exception:
+        result = {
+            "status": "error",
+            "evaluated": False,
+            "precision": None,
+            "recall": None,
+            "f1": None,
+            "confusion_matrix": None,
+            "detail": "Labeled evaluation failed. Metrics were not calculated.",
+        }
+    return AnomalyEvaluationResponse.model_validate(result)
 
 
 @router.get(

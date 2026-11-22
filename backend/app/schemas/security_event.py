@@ -56,7 +56,20 @@ class FeatureEvidence(BaseModel):
     value: float
     training_mean: float
     z_score: Optional[float] = None
+    comparison: str = "statistical_z_score"
     note: Optional[str] = None
+
+
+class FeatureDeviation(BaseModel):
+    """Absolute z-score against the training distribution. Not a SHAP value."""
+
+    name: str
+    value: float
+    training_mean: float
+    z_score: float
+    direction: str
+    comparison: str = "statistical_z_score"
+    explanation: str = "not_shap"
 
 
 class AnomalyAssessmentResponse(BaseModel):
@@ -66,8 +79,42 @@ class AnomalyAssessmentResponse(BaseModel):
     evaluated: bool
     status: str
     model_score: Optional[float] = None
+    score_direction: str
     model_version: str
     training_events: int
     minimum_training_events: int
     feature_evidence: List[FeatureEvidence] = Field(default_factory=list)
+    top_deviations: List[FeatureDeviation] = Field(default_factory=list)
+    deviation_method: str = "statistical_z_score"
+    detail: str
+
+
+class ConfusionMatrixResult(BaseModel):
+    labels: List[str]
+    matrix: List[List[int]]
+
+
+class LabeledScore(BaseModel):
+    event_id: str
+    label: str
+    prediction: str
+    model_score: float
+    training_events: int
+
+
+class AnomalyEvaluationResponse(BaseModel):
+    """Metrics only when explicit evaluation labels were stored and scored."""
+
+    status: str
+    evaluated: bool
+    precision: Optional[float] = None
+    recall: Optional[float] = None
+    f1: Optional[float] = None
+    confusion_matrix: Optional[ConfusionMatrixResult] = None
+    positive_class: str = "anomalous"
+    labeled_events: int = 0
+    scored_events: int = 0
+    unscored_events: int = 0
+    excluded_from_training: List[str] = Field(default_factory=list)
+    scored: List[LabeledScore] = Field(default_factory=list)
     detail: str

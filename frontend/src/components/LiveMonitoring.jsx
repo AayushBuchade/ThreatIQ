@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Pause, Play, RefreshCw, Search, X } from 'lucide-react';
-import { fetchEventAnomaly, fetchEventSummary, fetchRecentEvents } from '../services/api';
+import { fetchAnomalyEvaluation, fetchEventAnomaly, fetchEventSummary, fetchRecentEvents } from '../services/api';
 
 const PAGE_LIMIT = 100;
 const REFRESH_MS = 5000;
@@ -54,6 +54,8 @@ export default function LiveMonitoring() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
+  const [evaluation, setEvaluation] = useState(null);
+  const [evaluationError, setEvaluationError] = useState(null);
   const [assessments, setAssessments] = useState({});
   const assessmentsRef = useRef({});
   const anomalyRequests = useRef(new Set());
@@ -75,14 +77,22 @@ export default function LiveMonitoring() {
         sourceIp: sourceIp.trim() || undefined,
         q: search || undefined,
       };
-      const [storedSummary, matchSummary, recent] = await Promise.all([
+      const [storedSummary, matchSummary, recent, evaluationReport] = await Promise.all([
         fetchEventSummary(),
         fetchEventSummary(filters),
         fetchRecentEvents({ ...filters, limit: PAGE_LIMIT }),
+        fetchAnomalyEvaluation().catch((err) => {
+          setEvaluationError(err.message || 'Anomaly evaluation failed');
+          return null;
+        }),
       ]);
       setStored(storedSummary);
       setMatching(matchSummary);
       setEvents(recent?.events || []);
+      if (evaluationReport) {
+        setEvaluation(evaluationReport);
+        setEvaluationError(null);
+      }
       setError(null);
       setUpdatedAt(new Date());
       setSelected((current) => {
@@ -193,6 +203,8 @@ export default function LiveMonitoring() {
           <span>{error}. The last successful table is still shown.</span>
         </div>
       )}
+
+      <EvaluationCard report={evaluation} error={evaluationError} loading={loading && !evaluation} />
 
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
         <CountCard label="Stored events" value={loading && !stored ? '—' : storedTotal} tone="text-cyan-300" hint="All rows in the database" />
@@ -410,6 +422,37 @@ function anomalyLabel(assessment) {
   return { text: 'Not evaluated', tone: 'bg-slate-800 text-slate-400 border-slate-700' };
 }
 
+function EvaluationCard({ report, error, loading }) {
+  const evaluated = report?.status === 'evaluated' && report?.evaluated;
+  return (
+    <div className="bg-[#111827] border border-slate-800 rounded-xl p-4 space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] uppercase tracking-wide text-slate-400">Labeled model evaluation</p>
+        <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border border-slate-700 text-slate-300">
+          {evaluated ? 'Evaluated' : 'Not evaluated'}
+        </span>
+      </div>
+      {loading ? <p className="text-xs text-slate-500">Checking for supplied evaluation labels…</p> : null}
+      {error ? <p className="text-xs text-rose-300">{error} Metrics were not calculated.</p> : null}
+      {!loading && !evaluated ? (
+        <p className="text-xs text-slate-400">{report?.detail || 'Not evaluated. No labeled evaluation data was supplied.'}</p>
+      ) : null}
+      {evaluated ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <p className="text-slate-300">Precision <span className="block font-mono text-cyan-300">{report.precision}</span></p>
+          <p className="text-slate-300">Recall <span className="block font-mono text-cyan-300">{report.recall}</span></p>
+          <p className="text-slate-300">F1 <span className="block font-mono text-cyan-300">{report.f1}</span></p>
+          <p className="text-slate-400 md:col-span-1">Positive class: anomalous</p>
+          <p className="col-span-2 md:col-span-4 font-mono text-[11px] text-slate-400">
+            Confusion matrix [{report.confusion_matrix.labels.join(', ')}]: {JSON.stringify(report.confusion_matrix.matrix)}
+          </p>
+          <p className="col-span-2 md:col-span-4 text-[11px] text-slate-500">{report.detail}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AnomalyPill({ assessment }) {
   const label = anomalyLabel(assessment);
   return (
@@ -442,8 +485,26 @@ function AnomalyPanel({ assessment }) {
           <p className="text-xs text-slate-400">{assessment.detail}</p>
           <p className="text-[11px] font-mono text-slate-500">
             Model {assessment.model_version} · training events {assessment.training_events}/{assessment.minimum_training_events}
-            {evaluated ? ` · score ${assessment.model_score}` : ''}
+            {evaluated ? ` · decision_function ${assessment.model_score}` : ' · score not computed'}
           </p>
+          {assessment.score_direction ? (
+            <p className="text-[11px] text-slate-400">{assessment.score_direction}</p>
+          ) : null}
+          {evaluated && assessment.top_deviations?.length > 0 ? (
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Largest statistical deviations</p>
+              <p className="text-[11px] text-slate-500 mb-1">
+                Absolute z-scores against the training mean and standard deviation. This is not a SHAP explanation.
+              </p>
+              <ul className="space-y-1">
+                {assessment.top_deviations.map((feature) => (
+                  <li key={feature.name} className="font-mono text-[11px] text-slate-300">
+                    {feature.name}: {feature.value} vs mean {feature.training_mean} (z {feature.z_score}, {feature.direction})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {evaluated && assessment.feature_evidence?.length > 0 ? (
             <div className="max-h-48 overflow-y-auto border border-slate-800 rounded-md">
               <table className="w-full text-left text-[11px]">
