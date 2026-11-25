@@ -178,3 +178,18 @@ npm run build
 
 Results: **128 passed, 6 warnings in 1.57s**. Frontend build succeeded (`dist/assets/index-iBg365vk.js`). A local event with 5 earlier rows returned `insufficient_data`, model `threatiq-iforest-1.0.0`, and left `threat_score` at 0. The focused test also scored a later failed-login burst as anomalous with a lower decision score than a routine heartbeat. This is not the offline serialized Phase 2 pipeline. T2.1 remains **Upcoming**.
 
+---
+
+## 9. Day 6 — Score direction and labeled evaluation
+
+`model_score` stays the raw `decision_function` value. The API states that larger values are more normal and that the number is not a confidence percentage. Top feature gaps are absolute z-scores against the training mean, marked `not_shap`. `GET /api/v1/events/anomaly-evaluation` calculates precision, recall, F1, and a confusion matrix only for stored `attributes.evaluation_label` values of `normal` or `anomalous`. Severity is not a label. Labeled rows are excluded from that training matrix, which uses earlier unlabeled events only. With no labels the status is `not_evaluated` and the metrics are null.
+
+Command:
+
+```text
+.venv\Scripts\python.exe -m pytest backend/tests -q --tb=line
+npm run build
+```
+
+Results: **132 passed, 6 warnings in 1.56s**. Frontend build succeeded (`dist/assets/index-_H5Jit94.js`).
+
