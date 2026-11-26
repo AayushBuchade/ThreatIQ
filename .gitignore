@@ -15,6 +15,9 @@ downloads/
 eggs/
 .eggs/
 lib/
+!extension/mail/lib/
+!extension/mail/lib/mail.js
+!extension/mail/lib/mail.test.js
 lib64/
 parts/
 sdist/

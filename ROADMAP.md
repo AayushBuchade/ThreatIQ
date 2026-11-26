@@ -14,7 +14,7 @@
 | **0** | **Foundation & Architecture** | Platform Baseline | 4–6 days | **Completed** |
 | **1** | **Security Ingestion & Monitoring** | Module 1 | 8–12 days | **Upcoming** |
 | **2** | **AI Anomaly Detection** | Module 2 | 10–15 days | **Upcoming** |
-| **3** | **PHISHGUARD & Email Protection** | Module 3 | 10–14 days | **Upcoming** |
+| **3** | **PHISHGUARD & Email Protection** | Module 3 | 10–14 days | **In Progress** |
 | **4** | **URL & Vulnerability Intelligence** | Modules 4 & 6 | 10–14 days | **Upcoming** |
 | **5** | **SOC Incidents & Explainable AI** | Modules 7 & 8 | 12–16 days | **Upcoming** |
 | **6** | **Risk Intelligence & Attack Paths** | Modules 5 & 10 | 14–20 days | **Upcoming** |
@@ -84,14 +84,13 @@
   - Outlier scoring and automatic anomaly thresholding.
   - Model serialization manifest and drift monitoring.
 
-### Phase 3: PHISHGUARD & Email Protection (10–14 days) — [UPCOMING]
+### Phase 3: PHISHGUARD & Email Protection (10–14 days) — [IN PROGRESS]
 - **Target:** Module 3 (Live Gmail/Outlook Phishing Protection)
-- **Key Deliverables:**
-  - Ingest PHISHGUARD RFC 822 parser, NLP token preprocessor, and feature engineering.
-  - Load pre-trained Calibrated Linear SVM (97.16% holdout accuracy) with SHA-256 validation.
-  - Implement `/api/v1/email/analyze` and `/api/v1/email/parse-eml` endpoints.
-  - Gmail and Microsoft Graph webhook ingestion adapters.
-  - Instantaneous token attribution (< 2ms) and React email triage inspector.
+- **In place:** `POST /api/v1/email/analyze` loads the copied Calibrated Linear SVM and TF-IDF vectorizer after a SHA-256 check. scikit-learn is pinned to 1.7.2. The response returns the class, calibrated phishing probability, model version, TF-IDF linear token weights, and defanged suspicious URLs. Optional recording goes through `EventPipelineService` and skips a second row for the same message. The Email analysis page is at `#email`. `extension/mail` is a Manifest V3 scanner for the open Gmail or Outlook message. It calls this API, warns from the real prediction, and records only when the user reports the message.
+- **Still upcoming:**
+  - RFC 822 parser, feature-engineering risk score, and `/api/v1/email/parse-eml`.
+  - Gmail and Microsoft Graph mailbox webhooks. The extension reads the open web message only.
+  - LIME explanations and PDF reports.
 
 ### Phase 4: URL & Vulnerability Intelligence (10–14 days) — [UPCOMING]
 - **Target:** Module 4 (Malicious URL Intelligence) & Module 6 (Vulnerability Prioritization)

@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "ThreatIQ Mail Protection",
+  "version": "0.1.0",
+  "description": "Scores the open Gmail or Outlook message with the local ThreatIQ phishing API.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ThreatIQ Mail Protection"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.google.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*",
+        "https://outlook.live.com/*"
+      ],
+      "js": ["lib/mail.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
