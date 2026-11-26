@@ -78,6 +78,25 @@ export async function fetchEventAnomaly(eventId) {
   return response.json();
 }
 
+export async function analyzeEmail(payload) {
+  const response = await fetch(`${API_BASE}/email/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = data.detail;
+    const message = typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail)
+        ? detail.map((item) => item.msg).filter(Boolean).join(' ')
+        : `Email analysis failed: ${response.status}`;
+    throw new Error(message || `Email analysis failed: ${response.status}`);
+  }
+  return data;
+}
+
 export async function fetchEventSummary(params = {}) {
   const response = await fetch(`${API_BASE}/events/summary${eventQuery(params)}`);
   if (!response.ok) {

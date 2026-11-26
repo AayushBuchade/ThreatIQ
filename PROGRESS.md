@@ -193,3 +193,35 @@ npm run build
 
 Results: **132 passed, 6 warnings in 1.56s**. Frontend build succeeded (`dist/assets/index-_H5Jit94.js`).
 
+---
+
+## 10. Day 7 — PHISHGUARD email analysis
+
+The Calibrated Linear SVM and TF-IDF vectorizer from PHISHGUARD are copied into `backend/app/ml_models/phishing/` and checked by SHA-256 before scoring. `scikit-learn` is pinned to `1.7.2`, the version that serialized the artifacts. A version mismatch raises an error and returns no prediction. Scoring uses the upstream `clean_text` preprocessor, which is what training used. `POST /api/v1/email/analyze` returns the class, calibrated phishing probability, model version, and TF-IDF linear token weights. Recording uses `EventPipelineService`. The same subject, sender, and body do not create a second event. The Email analysis page is `#email`.
+
+Commands:
+
+```text
+.venv\Scripts\python.exe -m pip install scikit-learn==1.7.2
+.venv\Scripts\python.exe -m pytest backend/tests -q --tb=line
+npm run build
+```
+
+Results: **137 passed, 1 warning in 2.88s**. The remaining warning is the existing Starlette deprecation. The scikit-learn unpickle warnings are gone. Frontend build succeeded (`dist/assets/index-CX7kN9Qi.js`). Browser check on `#email` returned prediction `phishing`, probability `0.998875`, model `phishguard-linearsvc-calibrated@2026-10-10`, and linear token weights. Recording created `tiq-db21c31b4209`; a second submit kept that same event. Live Monitoring then showed 7 stored events and 1 high. Phase 3 remains **In Progress**: there is no mailbox webhook, RFC 822 parser, or LIME explanation.
+
+---
+
+## 11. Day 8 — Gmail and Outlook extension
+
+Day 7 tests were rerun first: **6 passed**. The upstream PHISHGUARD repository has no Chrome extension. `extension/mail` is a new Manifest V3 scanner for the open Gmail or Outlook web message. It sends subject, sender, and at most 20000 characters of body to `POST /api/v1/email/analyze`. Automatic scans use `record: false`. Report uses `record: true`, and the existing fingerprint skips a second event. Suspicious URLs are defanged and are not requested. The backend URL is stored locally and defaults to `http://127.0.0.1:8000`.
+
+Commands:
+
+```text
+.venv\Scripts\python.exe -m pytest backend/tests -q --tb=line
+node --test extension/mail/lib/mail.test.js
+npm run build
+```
+
+Results: **138 passed, 1 warning in 1.66s**. Extension helpers: **2 passed**. Frontend build succeeded (`dist/assets/index-Cug0Suqo.js`). The extension was not loaded in Chrome during this run.
+

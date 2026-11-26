@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ThreatIQ Mail</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main>
+    <h1>Threat<span>IQ</span></h1>
+    <p class="lead">Scores the open Gmail or Outlook message with your local API. The message is stored only when you report it.</p>
+    <label>
+      Backend URL
+      <input id="backend" type="url" spellcheck="false" />
+    </label>
+    <div class="actions">
+      <button id="save" type="button">Save</button>
+      <button id="check" type="button">Check connection</button>
+    </div>
+    <p id="status" role="status">Not checked.</p>
+  </main>
+  <script src="lib/mail.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

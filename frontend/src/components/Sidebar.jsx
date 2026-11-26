@@ -7,7 +7,6 @@ import {
 
 const disabledModules = [
   { id: 2, name: 'AI Anomaly Detection', phase: 'Phase 2', icon: Brain },
-  { id: 3, name: 'Phishing Protection', phase: 'Phase 3', icon: Mail },
   { id: 4, name: 'Malicious URL Intelligence', phase: 'Phase 4', icon: Globe },
   { id: 5, name: 'Cyber Risk Prediction', phase: 'Phase 6', icon: AlertOctagon },
   { id: 6, name: 'Vulnerability Prioritization', phase: 'Phase 4', icon: Target },
@@ -142,6 +141,21 @@ export default function Sidebar({ currentSection = 'overview', onNavigate }) {
                 </a>
 
                 <a
+                  href="#email"
+                  onClick={() => handleLinkClick('email')}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                    activeSection === 'email'
+                      ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 shadow-sm shadow-cyan-500/10'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/60 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <Mail className={`w-4 h-4 ${activeSection === 'email' ? 'text-cyan-400' : 'text-slate-400'}`} />
+                    <span>Email analysis</span>
+                  </div>
+                </a>
+
+                <a
                   href="#developer"
                   onClick={() => handleLinkClick('developer')}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
@@ -162,7 +176,7 @@ export default function Sidebar({ currentSection = 'overview', onNavigate }) {
             <div>
               <div className="px-3 mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 <span>Modules (Planned)</span>
-                <span className="text-[10px] font-mono text-slate-600">10 Disabled</span>
+                <span className="text-[10px] font-mono text-slate-600">9 Disabled</span>
               </div>
 
               <div className="space-y-1">

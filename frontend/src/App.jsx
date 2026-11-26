@@ -5,6 +5,7 @@ import SystemHealthCard from './components/SystemHealthCard';
 import ModuleStatusGrid from './components/ModuleStatusGrid';
 import TelemetryFeed from './components/TelemetryFeed';
 import LiveMonitoring from './components/LiveMonitoring';
+import PhishingAnalysis from './components/PhishingAnalysis';
 import { fetchHealth, fetchSystemStatus, fetchModules, fetchEventSummary } from './services/api';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -70,6 +71,8 @@ export default function App() {
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {section === 'events' && <LiveMonitoring />}
 
+          {section === 'email' && <PhishingAnalysis />}
+
           {section === 'developer' && (
             <section className="space-y-4">
               <div>
@@ -82,7 +85,7 @@ export default function App() {
             </section>
           )}
 
-          {section !== 'events' && section !== 'developer' && (
+          {section !== 'events' && section !== 'developer' && section !== 'email' && (
             <div className="space-y-6">
               <div id="overview" className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-slate-800 gap-4 scroll-mt-20">
                 <div>
